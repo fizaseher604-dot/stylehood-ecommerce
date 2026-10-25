@@ -30,9 +30,36 @@ const chatWithAI = async (req, res) => {
                 .split(/\s+/)
                 .filter(word => word.length > 2)
 
-            return keywords.some(keyword =>
-                searchableText.includes(keyword)
-            )
+           const hasShirt = /\b(shirt|shirts|t-shirt|tshirts|tee|tees)\b/i.test(text)
+const hasTrouser = /\b(trouser|trousers|pants|bottomwear)\b/i.test(text)
+const hasWinterwear = /\b(winterwear|winter|jacket|sweater|hoodie|coat)\b/i.test(text)
+const hasKids = /\b(kids|kid|children|child|boys|girls)\b/i.test(text)
+
+if (hasShirt) {
+    return /\b(shirt|shirts|t-shirt|tshirts|tee|tees)\b/i.test(
+        `${product.name || ''} ${product.description || ''}`
+    )
+}
+
+if (hasTrouser) {
+    return /\b(trouser|trousers|pants)\b/i.test(
+        `${product.name || ''} ${product.description || ''}`
+    )
+}
+
+if (hasWinterwear) {
+    return /\b(winter|jacket|sweater|hoodie|coat|winterwear)\b/i.test(
+        `${product.name || ''} ${product.description || ''} ${product.subCategory || ''}`
+    )
+}
+
+if (hasKids) {
+    return /\b(kids|children|child|boys|girls)\b/i.test(
+        `${product.name || ''} ${product.description || ''} ${product.category || ''}`
+    )
+}
+
+return keywords.some(keyword => searchableText.includes(keyword))
         })
 
         // Price filter, e.g. "under 3000"
