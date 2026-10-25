@@ -28,7 +28,14 @@ import 'react-toastify/dist/ReactToastify.css'
 const App = () => {
   return (
     <div>
-      <ToastContainer />
+      <ToastContainer
+  position="top-right"
+  autoClose={2500}
+  newestOnTop
+  closeOnClick
+  pauseOnHover
+  theme="light"
+/>
 
       <ScrollToTop />
 

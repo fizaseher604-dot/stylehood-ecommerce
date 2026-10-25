@@ -25,63 +25,76 @@ const ShopContextProvider = (props) => {
     const navigate = useNavigate();
 
     // Add product to cart
-    const addToCart = async (itemId, size, quantity = 1) => {
-        if (!size) {
-            toast.error("Select Product size");
-            return;
+    // Add product to cart — instant UI update + success toast
+const addToCart = async (itemId, size, quantity = 1) => {
+    if (!size) {
+        toast.error("Select Product size");
+        return;
+    }
+
+    const amount = Number(quantity);
+
+    if (!Number.isInteger(amount) || amount < 1) {
+        toast.error("Please select a valid quantity");
+        return;
+    }
+
+    if (!token) {
+        toast.error("Please login first");
+        navigate("/login");
+        return;
+    }
+
+    // Optimistically update the cart immediately
+    setCartItem((previousCart) => {
+        const updatedCart = structuredClone(previousCart);
+
+        if (!updatedCart[itemId]) {
+            updatedCart[itemId] = {};
         }
 
-        const amount = Number(quantity);
+        updatedCart[itemId][size] =
+            (Number(updatedCart[itemId][size]) || 0) + amount;
 
-        if (!Number.isInteger(amount) || amount < 1) {
-            toast.error("Please select a valid quantity");
-            return;
-        }
+        return updatedCart;
+    });
 
-        if (!token) {
-            toast.error("Please login first");
-            navigate("/login");
-            return;
-        }
+    // Show success feedback immediately
+    toast.success("Product added to cart!", {
+        toastId: `cart-${itemId}-${size}`,
+    });
 
-        try {
-            const response = await axios.post(
-                `${backendUrl}/api/cart/add`,
-                { itemId, size, quantity: amount },
-                { headers: { token } }
-            );
+    try {
+        const response = await axios.post(
+            `${backendUrl}/api/cart/add`,
+            { itemId, size, quantity: amount },
+            { headers: { token } }
+        );
 
-            if (response.data.success) {
-                if (response.data.cartData) {
-                    setCartItem(response.data.cartData);
-                } else {
-                    setCartItem((previousCart) => {
-                        const updatedCart = structuredClone(previousCart);
-
-                        if (!updatedCart[itemId]) {
-                            updatedCart[itemId] = {};
-                        }
-
-                        updatedCart[itemId][size] =
-                            (Number(updatedCart[itemId][size]) || 0) +
-                            amount;
-
-                        return updatedCart;
-                    });
-                }
-            } else {
-                toast.error(
-                    response.data.message || "Unable to add product"
-                );
+        if (response.data.success) {
+            // Sync with the server's latest cart if it provides one
+            if (response.data.cartData) {
+                setCartItem(response.data.cartData);
             }
-        } catch (error) {
-            console.error("Add To Cart Error:", error);
+        } else {
+            // Roll back the optimistic update if the server rejects it
+            await loadUserCart(token);
             toast.error(
-                error.response?.data?.message ||
-                    "Unable to add product to cart"
+                response.data.message || "Unable to add product"
             );
         }
-    };
+    } catch (error) {
+        console.error("Add To Cart Error:", error);
+
+        // Restore the cart from the server after a failed request
+        await loadUserCart(token);
+
+        toast.error(
+            error.response?.data?.message ||
+                "Unable to add product to cart"
+        );
+    }
+};
 
     // Fetch cart data
     const loadUserCart = useCallback(
