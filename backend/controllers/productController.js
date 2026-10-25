@@ -1,8 +1,10 @@
 import { v2 as cloudinary } from "cloudinary";
 import productModel from "../models/productModel.js";
 
-// Function for add product
+// Add Product
 const addProduct = async (req, res) => {
+  const startTime = Date.now();
+
   try {
     const {
       name,
@@ -14,9 +16,35 @@ const addProduct = async (req, res) => {
       bestseller,
     } = req.body;
 
+    // Validate required fields
+    if (
+      !name ||
+      !description ||
+      !price ||
+      !category ||
+      !subCategory ||
+      !sizes
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Please fill all required fields",
+      });
+    }
+
+    // Get selected images
     const images = (req.files || []).filter((file) =>
-      ["image1", "image2", "image3", "image4"].includes(file.fieldname),
+      ["image1", "image2", "image3", "image4"].includes(file.fieldname)
     );
+
+    if (images.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Please select at least one product image",
+      });
+    }
+
+    // Upload images to Cloudinary in parallel
+    const uploadStart = Date.now();
 
     const imagesUrl = await Promise.all(
       images.map(async (item) => {
@@ -26,12 +54,17 @@ const addProduct = async (req, res) => {
         });
 
         return result.secure_url;
-      }),
+      })
     );
 
+    const uploadTime = Date.now() - uploadStart;
+
+    console.log(`Cloudinary upload time: ${uploadTime} ms`);
+
+    // Prepare product data
     const productData = {
-      name,
-      description,
+      name: name.trim(),
+      description: description.trim(),
       price: Number(price),
       category,
       subCategory,
@@ -41,84 +74,126 @@ const addProduct = async (req, res) => {
       date: Date.now(),
     };
 
-    const product = new productModel(productData);
+    // Save product to MongoDB
+    const dbStart = Date.now();
 
+    const product = new productModel(productData);
     await product.save();
 
-    res.json({
+    const dbTime = Date.now() - dbStart;
+    const totalTime = Date.now() - startTime;
+
+    console.log(`MongoDB save time: ${dbTime} ms`);
+    console.log(`Total product add time: ${totalTime} ms`);
+
+    return res.json({
       success: true,
-      message: "Product Added Successfully"
-     
+      message: "Product Added Successfully",
+      product,
     });
   } catch (error) {
-    console.log(error);
+    console.error("Add product error:", error);
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
-      message: error.message,
+      message: error.message || "Failed to add product",
     });
   }
 };
 
-// Function for list product
+// List Products
 const listProducts = async (req, res) => {
   try {
-    const products = await productModel.find({});
+    const products = await productModel.find({}).lean();
 
-    res.json({
+    return res.json({
       success: true,
       products,
     });
   } catch (error) {
-    console.log(error);
+    console.error("List products error:", error);
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: error.message,
     });
   }
 };
 
-// Function for remove product
-
+// Remove Product
 const removeProduct = async (req, res) => {
   try {
-    console.log("1. Remove function started");
-    console.log("2. Request body:", req.body);
+    const { id } = req.body;
 
-    const product = await productModel.findByIdAndDelete(req.body.id);
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        message: "Product ID is required",
+      });
+    }
 
-    console.log("3. Database query completed");
+    const product = await productModel.findByIdAndDelete(id);
 
-    res.json({
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: "Product not found",
+      });
+    }
+
+    return res.json({
       success: true,
       message: "Product Removed",
-      product
+      product,
     });
   } catch (error) {
-    console.log("Remove error:", error.message);
+    console.error("Remove product error:", error);
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message,
     });
   }
 };
 
-// Function for single product info
+// Single Product
 const singleProduct = async (req, res) => {
-   try {
-       const { productId}= req.body
-       const product=await productModel.findById(productId)
-       res.json({success:true,product})
-   } catch (error) {
-      console.log("Remove error:", error.message);
+  try {
+    const { productId } = req.body;
 
-    res.status(500).json({
-      success: false,
-      message: error.message
+    if (!productId) {
+      return res.status(400).json({
+        success: false,
+        message: "Product ID is required",
+      });
+    }
+
+    const product = await productModel.findById(productId).lean();
+
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: "Product not found",
+      });
+    }
+
+    return res.json({
+      success: true,
+      product,
     });
-   }
+  } catch (error) {
+    console.error("Single product error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
 };
 
-export { addProduct, listProducts, removeProduct, singleProduct };
+export {
+  addProduct,
+  listProducts,
+  removeProduct,
+  singleProduct,
+};
