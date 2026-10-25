@@ -5,21 +5,30 @@ import { toast } from 'react-toastify'
 
 const List = ({ token }) => {
   const [list, setList] = useState([])
+const [loading, setLoading] = useState(true)
 
   const fetchList = async () => {
-    try {
-      const response = await axios.get(backendUrl + '/api/product/list')
+  setLoading(true)
 
-      if (response.data.success) {
-        setList(response.data.products)
-      } else {
-        toast.error(response.data.message)
-      }
-    } catch (error) {
-      console.log(error.response?.data || error)
-      toast.error(error.response?.data?.message || error.message)
+  try {
+    const response = await axios.get(
+      backendUrl + '/api/product/list'
+    )
+
+    if (response.data.success) {
+      setList(response.data.products || [])
+    } else {
+      toast.error(response.data.message || 'Failed to load products')
     }
+  } catch (error) {
+    console.error(error.response?.data || error)
+    toast.error(
+      error.response?.data?.message || 'Failed to load products'
+    )
+  } finally {
+    setLoading(false)
   }
+}
 
   const removeProduct = async (id) => {
     if (!window.confirm('Are you sure you want to remove this product?')) return
@@ -109,7 +118,19 @@ const List = ({ token }) => {
         </div>
 
         <div className="flex flex-col gap-3 mt-3">
-          {list.length === 0 ? (
+  {loading ? (
+    <div className="flex flex-col items-center justify-center py-14 border border-slate-200 rounded-xl">
+      <div className="w-9 h-9 border-4 border-orange-100 border-t-[#F97316] rounded-full animate-spin" />
+
+      <p className="text-sm font-semibold text-[#0F172A] mt-4">
+        Loading products...
+      </p>
+
+      <p className="text-xs text-slate-500 mt-1">
+        Please wait while your collection loads.
+      </p>
+    </div>
+  ) : list.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-14 border border-dashed border-slate-200 rounded-xl">
               <div className="w-14 h-14 rounded-xl bg-orange-50 flex items-center justify-center mb-3">
                 <svg className="w-7 h-7 text-[#F97316]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
