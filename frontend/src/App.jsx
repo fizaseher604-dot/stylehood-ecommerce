@@ -1,5 +1,4 @@
 
-
 import { Routes, Route } from 'react-router-dom'
 
 import Home from './pages/Home'
@@ -21,6 +20,7 @@ import ReturnsExchanges from './pages/ReturnsExchanges'
 import PrivacyPolicy from './pages/PrivacyPolicy'
 import TermsConditions from './pages/TermsConditions'
 import ScrollToTop from './components/ScrollToTop'
+import AIChatbot from './components/AIChatbot'
 
 import { ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
@@ -29,13 +29,13 @@ const App = () => {
   return (
     <div>
       <ToastContainer
-  position="top-right"
-  autoClose={2500}
-  newestOnTop
-  closeOnClick
-  pauseOnHover
-  theme="light"
-/>
+        position="top-right"
+        autoClose={2500}
+        newestOnTop
+        closeOnClick
+        pauseOnHover
+        theme="light"
+      />
 
       <ScrollToTop />
 
@@ -57,20 +57,22 @@ const App = () => {
           path='/shipping-delivery'
           element={<ShippingDelivery />}
         />
+
         <Route
           path='/returns-exchanges'
           element={<ReturnsExchanges />}
         />
+
         <Route
           path='/privacy-policy'
           element={<PrivacyPolicy />}
         />
+
         <Route
           path='/terms-conditions'
           element={<TermsConditions />}
         />
 
-        {/* Reset Password */}
         <Route
           path='/reset-password/:token'
           element={<ResetPassword />}
@@ -78,6 +80,9 @@ const App = () => {
       </Routes>
 
       <Footer />
+
+      {/* Free AI Fashion Chatbot */}
+      <AIChatbot />
     </div>
   )
 }
