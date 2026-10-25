@@ -5,11 +5,14 @@ import { backendUrl } from '../App'
 import { toast } from 'react-toastify'
 
 const Add = ({ token }) => {
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
   const [image1, setImage1] = useState(false)
   const [image2, setImage2] = useState(false)
   const [image3, setImage3] = useState(false)
   const [image4, setImage4] = useState(false)
 
+ 
   const [name, setName] = useState('')
   const [desciption, setDescription] = useState('')
   const [price, setPrice] = useState('')
@@ -19,62 +22,103 @@ const Add = ({ token }) => {
   const [sizes, setSizes] = useState([])
 
   const onSubmitHandler = async (e) => {
-    e.preventDefault()
+  e.preventDefault()
 
-    try {
-      const formData = new FormData()
+  // Prevent duplicate product submissions
+  if (isSubmitting) return
 
-      formData.append('name', name)
-      formData.append('description', desciption)
-      formData.append('price', price)
-      formData.append('category', category)
-      formData.append('subCategory', subCategory)
-      formData.append('bestseller', bestseller)
-      formData.append('sizes', JSON.stringify(sizes))
-
-      image1 && formData.append('image1', image1)
-      image2 && formData.append('image2', image2)
-      image3 && formData.append('image3', image3)
-      image4 && formData.append('image4', image4)
-
-      const response = await axios.post(
-        backendUrl + '/api/product/add',
-        formData,
-        {
-          headers: {
-            token: token,
-          },
-        }
-      )
-
-      console.log('API RESPONSE:', response.data)
-
-      if (response.data.success) {
-        toast.success(response.data.message)
-
-        setName('')
-        setDescription('')
-
-        setImage1(false)
-        setImage2(false)
-        setImage3(false)
-        setImage4(false)
-
-        setPrice('')
-        setCategory('Men')
-        setSubCategory('Topwear')
-        setSizes([])
-        setBestSeller(false)
-
-        e.target.reset()
-      } else {
-        toast.error(response.data.message)
-      }
-    } catch (error) {
-      console.log(error)
-      toast.error(error.response?.data?.message || error.message)
-    }
+  if (!name.trim() || !desciption.trim() || !price) {
+    toast.error('Please fill in all required fields')
+    return
   }
+
+  if (![image1, image2, image3, image4].some(Boolean)) {
+    toast.error('Please upload at least one product image')
+    return
+  }
+
+  if (sizes.length === 0) {
+    toast.error('Please select at least one size')
+    return
+  }
+
+  setIsSubmitting(true)
+
+  const loadingToast = toast.loading('Uploading product...')
+
+  try {
+    const formData = new FormData()
+
+    formData.append('name', name.trim())
+    formData.append('description', desciption.trim())
+    formData.append('price', price)
+    formData.append('category', category)
+    formData.append('subCategory', subCategory)
+    formData.append('bestseller', bestseller)
+    formData.append('sizes', JSON.stringify(sizes))
+
+    if (image1) formData.append('image1', image1)
+    if (image2) formData.append('image2', image2)
+    if (image3) formData.append('image3', image3)
+    if (image4) formData.append('image4', image4)
+
+    const response = await axios.post(
+      `${backendUrl}/api/product/add`,
+      formData,
+      {
+        headers: {
+          token,
+        },
+      }
+    )
+
+    if (response.data.success) {
+      toast.update(loadingToast, {
+        render: response.data.message || 'Product added successfully!',
+        type: 'success',
+        isLoading: false,
+        autoClose: 3000,
+        closeButton: true,
+      })
+
+      setName('')
+      setDescription('')
+      setImage1(false)
+      setImage2(false)
+      setImage3(false)
+      setImage4(false)
+      setPrice('')
+      setCategory('Men')
+      setSubCategory('Topwear')
+      setSizes([])
+      setBestSeller(false)
+
+      e.target.reset()
+    } else {
+      toast.update(loadingToast, {
+        render: response.data.message || 'Unable to add product',
+        type: 'error',
+        isLoading: false,
+        autoClose: 4000,
+        closeButton: true,
+      })
+    }
+  } catch (error) {
+    console.error('Add Product Error:', error)
+
+    toast.update(loadingToast, {
+      render:
+        error.response?.data?.message ||
+        'Product upload failed. Please try again.',
+      type: 'error',
+      isLoading: false,
+      autoClose: 4000,
+      closeButton: true,
+    })
+  } finally {
+    setIsSubmitting(false)
+  }
+}
 
   const imageStates = [
     { image: image1, setImage: setImage1, id: 'image1' },
@@ -376,12 +420,27 @@ const Add = ({ token }) => {
             </label>
           </section>
 
-          <button
-            type="submit"
-            className="w-full bg-[#0F172A] hover:bg-[#F97316] text-white font-semibold text-sm rounded-xl py-4 transition duration-200 shadow-sm"
-          >
-            ADD PRODUCT
-          </button>
+         <button
+  type="submit"
+  disabled={isSubmitting}
+  className={`w-full flex items-center justify-center gap-3
+    bg-[#0F172A] text-white font-semibold text-sm rounded-xl
+    py-4 transition duration-200 shadow-sm
+    ${
+      isSubmitting
+        ? 'opacity-80 cursor-not-allowed'
+        : 'hover:bg-[#F97316]'
+    }`}
+>
+  {isSubmitting ? (
+    <>
+      <span className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+      <span>UPLOADING PRODUCT...</span>
+    </>
+  ) : (
+    'ADD PRODUCT'
+  )}
+</button>
         </div>
       </form>
     </div>
