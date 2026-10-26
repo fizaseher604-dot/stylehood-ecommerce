@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { v2 as cloudinary } from "cloudinary"; // NEW
 import orderModel from "../models/orderModel.js";
 import userModel from "../models/userModel.js";
 import productModel from "../models/productModel.js";
@@ -369,9 +370,326 @@ const updateStatus = async (req, res) => {
   }
 };
 
+// NEW: Bank Transfer / JazzCash / Easypaisa order with payment proof
+const placeOrderManual = async (req, res) => {
+  const reservedItems = [];
+  let orderSaved = false;
+
+  const restoreStock = async () => {
+    for (const reserved of [...reservedItems].reverse()) {
+      await productModel.updateOne(
+        { _id: reserved.id },
+        { $inc: { stock: reserved.quantity } }
+      );
+    }
+
+    reservedItems.length = 0;
+  };
+
+  try {
+    const userId = req.body.userId;
+    const paymentRef = String(req.body.paymentRef || "").trim().slice(0, 100);
+
+    // Multipart form mein items/address string hoti hain, isliye parse karte hain
+    let items;
+    let address;
+
+    try {
+      items =
+        typeof req.body.items === "string"
+          ? JSON.parse(req.body.items)
+          : req.body.items;
+      address =
+        typeof req.body.address === "string"
+          ? JSON.parse(req.body.address)
+          : req.body.address;
+    } catch (parseError) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid order data",
+      });
+    }
+
+    if (!userId || !mongoose.isValidObjectId(userId)) {
+      return res.status(401).json({
+        success: false,
+        message: "User authentication required",
+      });
+    }
+
+    if (!req.file && !paymentRef) {
+      return res.status(400).json({
+        success: false,
+        message: "Please upload a payment screenshot or enter the Transaction ID",
+      });
+    }
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Order must contain at least one product",
+      });
+    }
+
+    if (
+      !address ||
+      typeof address !== "object" ||
+      Array.isArray(address) ||
+      !address.firstName ||
+      !address.lastName ||
+      !address.email ||
+      !address.street ||
+      !address.city ||
+      !address.phone
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide complete delivery information",
+      });
+    }
+
+    for (const item of items) {
+      const quantity = Number(item?.quantity);
+
+      if (
+        !item?._id ||
+        !mongoose.isValidObjectId(item._id) ||
+        typeof item.size !== "string" ||
+        !item.size.trim() ||
+        !Number.isInteger(quantity) ||
+        quantity < 1 ||
+        quantity > 40
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid product, size or quantity",
+        });
+      }
+    }
+
+    const productIds = [...new Set(items.map((item) => String(item._id)))];
+
+    const products = await productModel
+      .find({ _id: { $in: productIds } })
+      .lean();
+
+    const productMap = new Map(
+      products.map((product) => [String(product._id), product])
+    );
+
+    const verifiedItems = [];
+    const requestedByProduct = new Map();
+    let subtotal = 0;
+
+    for (const item of items) {
+      const product = productMap.get(String(item._id));
+      const quantity = Number(item.quantity);
+
+      if (!product) {
+        return res.status(400).json({
+          success: false,
+          message: "A product in your cart no longer exists",
+        });
+      }
+
+      const availableSizes = Array.isArray(product.Sizes)
+        ? product.Sizes.map(String)
+        : [];
+
+      if (!availableSizes.includes(item.size)) {
+        return res.status(400).json({
+          success: false,
+          message: `Selected size is unavailable for ${product.name}`,
+        });
+      }
+
+      const price = Number(product.price);
+
+      if (!Number.isFinite(price) || price < 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid product price",
+        });
+      }
+
+      const productId = String(product._id);
+
+      requestedByProduct.set(
+        productId,
+        (requestedByProduct.get(productId) || 0) + quantity
+      );
+
+      verifiedItems.push({
+        _id: productId,
+        name: product.name,
+        price,
+        Image: product.Image,
+        category: product.category,
+        size: item.size,
+        quantity,
+      });
+
+      subtotal += price * quantity;
+    }
+
+    for (const [productId, requestedQuantity] of requestedByProduct) {
+      const product = productMap.get(productId);
+      const available = Number(product?.stock) || 0;
+
+      if (available < requestedQuantity) {
+        return res.status(409).json({
+          success: false,
+          message: `${
+            product?.name || "Product"
+          } has only ${available} item(s) available, but ${requestedQuantity} requested. Please update your cart.`,
+        });
+      }
+    }
+
+    // Payment screenshot upload (stock reserve se pehle, taake fail hone par restore na karna pare)
+    let paymentProof = "";
+
+    if (req.file) {
+      const uploaded = await cloudinary.uploader.upload(req.file.path, {
+        resource_type: "image",
+      });
+      paymentProof = uploaded.secure_url;
+    }
+
+    for (const [productId, quantity] of requestedByProduct) {
+      const updatedProduct = await productModel.findOneAndUpdate(
+        {
+          _id: productId,
+          stock: { $gte: quantity },
+        },
+        {
+          $inc: { stock: -quantity },
+        },
+        {
+          new: true,
+        }
+      );
+
+      if (!updatedProduct) {
+        const latestProduct = await productModel
+          .findById(productId)
+          .select("name stock")
+          .lean();
+
+        await restoreStock();
+
+        return res.status(409).json({
+          success: false,
+          message: latestProduct
+            ? `${latestProduct.name} has only ${
+                Number(latestProduct.stock) || 0
+              } item(s) left. Please update your cart and try again.`
+            : "A product in your cart no longer exists",
+        });
+      }
+
+      reservedItems.push({
+        id: String(updatedProduct._id),
+        quantity,
+      });
+    }
+
+    const newOrder = new orderModel({
+      userId,
+      items: verifiedItems,
+      address,
+      amount: subtotal + DELIVERY_FEE,
+      paymentMethod: "Bank Transfer",
+      payment: false, // admin verify karke true karega
+      paymentProof,
+      paymentRef,
+      status: "Order Placed",
+      date: Date.now(),
+    });
+
+    await newOrder.save();
+    orderSaved = true;
+
+    await userModel.findByIdAndUpdate(userId, {
+      cartData: {},
+    });
+
+    return res.json({
+      success: true,
+      message: "Order placed. Your payment will be verified shortly.",
+      order: newOrder,
+    });
+  } catch (error) {
+    console.error("Place Manual Order Error:", error);
+
+    if (!orderSaved && reservedItems.length > 0) {
+      try {
+        await restoreStock();
+      } catch (restoreError) {
+        console.error("Stock restoration error:", restoreError);
+      }
+    }
+
+    return res.status(500).json({
+      success: false,
+      message: orderSaved
+        ? "Your order was saved, but another operation failed. Check My Orders before trying again."
+        : "Unable to place order. Please try again.",
+    });
+  }
+};
+
+// NEW: Admin payment verify karne ke baad Paid mark kare
+const markOrderPaid = async (req, res) => {
+  try {
+    const { orderId } = req.body;
+
+    if (!orderId || !mongoose.isValidObjectId(orderId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid order ID is required",
+      });
+    }
+
+    const order = await orderModel.findById(orderId);
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found",
+      });
+    }
+
+    if (order.paymentMethod !== "Bank Transfer") {
+      return res.status(400).json({
+        success: false,
+        message: "Only Bank Transfer orders can be marked as paid here",
+      });
+    }
+
+    order.payment = true;
+    await order.save();
+
+    return res.json({
+      success: true,
+      message: "Payment marked as received",
+      order,
+    });
+  } catch (error) {
+    console.error("Mark Order Paid Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Unable to update payment status",
+    });
+  }
+};
+
 export {
   placeOrder,
   allOrders,
   userOrders,
   updateStatus,
+  placeOrderManual, // NEW
+  markOrderPaid,    // NEW
 };

@@ -10,6 +10,15 @@ const Orders = () => {
   const [loading, setLoading] = useState(true)
   const [expandedOrder, setExpandedOrder] = useState(null)
 
+  // NEW: login/token wale messages par toast nahi dikhana, aur ek hi toast dikhana (duplicate nahi)
+  const showLoadError = (message) => {
+    if (/token|login|authori[sz]/i.test(message || '')) return
+
+    toast.error(message || 'Unable to load your orders', {
+      toastId: 'load-orders-error',
+    })
+  }
+
   const loadOrderData = async () => {
     try {
       setLoading(true)
@@ -37,14 +46,16 @@ const Orders = () => {
         setOrders(sortedOrders)
       } else {
         setOrders([])
-        toast.error(response.data.message || 'Unable to load orders')
+        showLoadError(response.data.message) // NEW
       }
     } catch (error) {
       console.error('Load orders error:', error)
       setOrders([])
-      toast.error(
-        error.response?.data?.message || 'Unable to load your orders'
-      )
+
+      // NEW: 401 (login/token masla) par toast nahi, baaqi asal errors par ek toast
+      if (error.response?.status !== 401) {
+        showLoadError(error.response?.data?.message)
+      }
     } finally {
       setLoading(false)
     }
@@ -171,9 +182,38 @@ const Orders = () => {
     return method || 'Not specified'
   }
 
+  // NEW: payment ka status (Paid / Payment Pending / Pay on Delivery)
+  const getPaymentStatus = (order) => {
+    if (order.payment) {
+      return {
+        label: 'Paid',
+        style: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+        dot: 'bg-emerald-500',
+      }
+    }
+
+    if (order.paymentMethod === 'Bank Transfer') {
+      return {
+        label: 'Payment Pending',
+        style: 'bg-amber-50 text-amber-700 border-amber-200',
+        dot: 'bg-amber-500',
+      }
+    }
+
+    return {
+      label: 'Pay on Delivery',
+      style: 'bg-slate-100 text-slate-600 border-slate-200',
+      dot: 'bg-slate-400',
+    }
+  }
+
   const getOrderId = (order) => {
     const id = order._id || order.id
     return id ? String(id).slice(-8).toUpperCase() : 'N/A'
+  }
+
+  const getOrderItems = (order) => {
+    return Array.isArray(order.items) ? order.items : []
   }
 
   const getOrderTotal = (order) => {
@@ -181,15 +221,11 @@ const Orders = () => {
       return Number(order.amount) || 0
     }
 
-    return order.items.reduce((total, item) => {
+    return getOrderItems(order).reduce((total, item) => {
       const price = Number(item.price ?? item.Price) || 0
       const quantity = Number(item.quantity ?? item.qty) || 1
       return total + price * quantity
     }, 0)
-  }
-
-  const getOrderItems = (order) => {
-    return Array.isArray(order.items) ? order.items : []
   }
 
   const totalItems = orders.reduce(
@@ -299,6 +335,7 @@ const Orders = () => {
             {orders.map((order, orderIndex) => {
               const orderItems = getOrderItems(order)
               const status = getStatus(order.status || order.orderStatus)
+              const paymentStatus = getPaymentStatus(order) // NEW
               const orderKey = String(order._id || order.id || orderIndex)
               const isTracking = expandedOrder === orderKey
 
@@ -327,6 +364,14 @@ const Orders = () => {
                       >
                         <span className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
                         {status.label}
+                      </span>
+
+                      {/* NEW: Payment status badge */}
+                      <span
+                        className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold ${paymentStatus.style}`}
+                      >
+                        <span className={`w-1.5 h-1.5 rounded-full ${paymentStatus.dot}`} />
+                        {paymentStatus.label}
                       </span>
 
                       <button
@@ -371,6 +416,14 @@ const Orders = () => {
 
                   {/* Product List */}
                   <div className="p-4 sm:p-6">
+                    {/* NEW: Bank Transfer payment pending notice */}
+                    {order.paymentMethod === 'Bank Transfer' && !order.payment && (
+                      <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-800">
+                        <span className="font-bold">Payment under review.</span>{' '}
+                        We have received your payment details. Your order will move forward once the payment is verified.
+                      </div>
+                    )}
+
                     <div className="space-y-5">
                       {orderItems.map((item, itemIndex) => {
                         const image = getImage(item)
@@ -539,7 +592,7 @@ const Orders = () => {
                             </>
                           )}
 
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
                             <div className="rounded-lg bg-slate-50 border border-slate-100 p-3">
                               <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">
                                 Payment Method
@@ -548,6 +601,16 @@ const Orders = () => {
                                 {getPaymentMethod(
                                   order.paymentMethod || order.paymentMethodName
                                 )}
+                              </p>
+                            </div>
+
+                            {/* NEW: Payment Status card */}
+                            <div className="rounded-lg bg-slate-50 border border-slate-100 p-3">
+                              <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">
+                                Payment Status
+                              </p>
+                              <p className="text-sm font-semibold mt-1">
+                                {paymentStatus.label}
                               </p>
                             </div>
 

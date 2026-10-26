@@ -8,6 +8,7 @@ const Orders = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [updatingOrder, setUpdatingOrder] = useState(null);
+  const [markingPaid, setMarkingPaid] = useState(null); // NEW
 
   const token = localStorage.getItem("token");
 
@@ -111,6 +112,48 @@ const Orders = () => {
       await fetchAllOrders();
     } finally {
       setUpdatingOrder(null);
+    }
+  };
+
+  // NEW: Bank Transfer payment verify karke Paid mark karna
+  const markPaid = async (orderId) => {
+    if (!token || markingPaid) return;
+
+    const confirmed = window.confirm(
+      "Have you verified this payment? The order will be marked as Paid."
+    );
+
+    if (!confirmed) return;
+
+    setMarkingPaid(orderId);
+
+    try {
+      const response = await axios.post(
+        backendUrl + "/api/order/mark-paid",
+        { orderId },
+        { headers: { token } }
+      );
+
+      if (response.data.success) {
+        toast.success("Payment marked as received");
+        await fetchAllOrders();
+      } else {
+        toast.error(
+          response.data.message || "Failed to mark payment as paid"
+        );
+      }
+    } catch (error) {
+      console.error(
+        "Mark Paid Error:",
+        error.response?.data || error.message
+      );
+
+      toast.error(
+        error.response?.data?.message ||
+          "Failed to mark payment as paid"
+      );
+    } finally {
+      setMarkingPaid(null);
     }
   };
 
@@ -555,6 +598,57 @@ const Orders = () => {
                             </span>
                           </div>
                         </div>
+
+                        {/* NEW: Bank Transfer payment proof + verify button */}
+                        {order.paymentMethod === "Bank Transfer" && (
+                          <div className="mt-4 rounded-xl border border-orange-200 bg-orange-50/60 p-3">
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-orange-700">
+                              Payment Proof
+                            </p>
+
+                            {order.paymentRef && (
+                              <p className="mt-2 break-all text-xs text-slate-700">
+                                <span className="font-semibold">Txn ID:</span>{" "}
+                                {order.paymentRef}
+                              </p>
+                            )}
+
+                            {order.paymentProof ? (
+                              <a
+                                href={order.paymentProof}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="mt-2 block"
+                              >
+                                <img
+                                  src={order.paymentProof}
+                                  alt="Payment screenshot"
+                                  className="h-28 w-full rounded-lg border border-orange-200 bg-white object-cover"
+                                />
+                                <span className="mt-1 block text-[11px] font-semibold text-[#F97316]">
+                                  Click to view full screenshot
+                                </span>
+                              </a>
+                            ) : (
+                              <p className="mt-2 text-xs text-slate-500">
+                                No screenshot uploaded
+                              </p>
+                            )}
+
+                            {!order.payment && (
+                              <button
+                                type="button"
+                                disabled={markingPaid === order._id}
+                                onClick={() => markPaid(order._id)}
+                                className="mt-3 w-full rounded-lg bg-emerald-600 px-3 py-2.5 text-xs font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                {markingPaid === order._id
+                                  ? "Updating..."
+                                  : "Mark as Paid"}
+                              </button>
+                            )}
+                          </div>
+                        )}
 
                         <div className="mt-5 rounded-xl bg-[#0F172A] p-4">
                           <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-300">

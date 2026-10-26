@@ -43,13 +43,25 @@ const orderSchema = new mongoose.Schema({
   paymentMethod: {
     type: String,
     required: true,
-    enum: ["COD", "Stripe", "Razorpay"],
+    enum: ["COD", "Stripe", "Razorpay", "Bank Transfer"], // NEW: "Bank Transfer"
   },
 
   payment: {
     type: Boolean,
     required: true,
     default: false,
+  },
+
+  // NEW: customer ka payment screenshot (Cloudinary URL)
+  paymentProof: {
+    type: String,
+    default: "",
+  },
+
+  // NEW: customer ki Transaction ID
+  paymentRef: {
+    type: String,
+    default: "",
   },
 
   date: {
