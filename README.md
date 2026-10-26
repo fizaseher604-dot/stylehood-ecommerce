@@ -55,19 +55,19 @@ Built as a full-stack MERN e-commerce portfolio project.
 ## 📸 Website Screenshots
 
 ### 🏠 Home Page
-![Stylehood Home Page](screenshots/home.png)
+![Stylehood Home Page](./screenShots/home.png)
 
 ### 🛍️ Collection Page
-![Stylehood Collection Page](screenshots/collection.png)
+![Stylehood Collection Page](./screenShots/collection.png)
 
 ### 👗 Product Details
-![Stylehood Product Page](screenshots/product-details.png)
+![Stylehood Product Page](./screenShots/product-details.png)
 
 ### 🛒 Shopping Cart
-![Stylehood Cart Page](screenshots/cart.png)
+![Stylehood Cart Page](./screenShots/cart.png)
 
 ### 💳 Checkout / Place Order Page
-![Stylehood Checkout Page](screenshots/checkout.png)
+![Stylehood Checkout Page](./screenShots/checkout.png)
 
 ### 🖥️ Admin Dashboard
-![Stylehood Admin Dashboard](screenshots/admin-dashboard.png)
+![Stylehood Admin Dashboard](./screenShots/admin-dashboard.png)
