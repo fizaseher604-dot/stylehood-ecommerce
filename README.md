@@ -55,20 +55,19 @@ Built as a full-stack MERN e-commerce portfolio project.
 ## 📸 Website Screenshots
 
 ### 🏠 Home Page
-![Stylehood Home Page](https://github.com/fizaseher604-dot/stylehood-ecommerce/raw/main/screenshots/home.png)
+![Stylehood Home Page](screenshots/home.png)
 
 ### 🛍️ Collection Page
-![Stylehood Collection Page](https://github.com/fizaseher604-dot/stylehood-ecommerce/raw/main/screenshots/collection.png)
+![Stylehood Collection Page](screenshots/collection.png)
 
 ### 👗 Product Details
-![Stylehood Product Page](https://github.com/fizaseher604-dot/stylehood-ecommerce/raw/main/screenshots/product-details.png)
+![Stylehood Product Page](screenshots/product-details.png)
 
 ### 🛒 Shopping Cart
-![Stylehood Cart Page](https://github.com/fizaseher604-dot/stylehood-ecommerce/raw/main/screenshots/cart.png)
+![Stylehood Cart Page](screenshots/cart.png)
 
 ### 💳 Checkout / Place Order Page
-![Stylehood Checkout Page](https://github.com/fizaseher604-dot/stylehood-ecommerce/raw/main/screenshots/checkout.png)
+![Stylehood Checkout Page](screenshots/checkout.png)
 
 ### 🖥️ Admin Dashboard
-![Stylehood Admin Dashboard](https://github.com/fizaseher604-dot/stylehood-ecommerce/raw/main/screenshots/admin-dashboard.png)
-
+![Stylehood Admin Dashboard](screenshots/admin-dashboard.png)
