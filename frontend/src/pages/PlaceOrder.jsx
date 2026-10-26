@@ -6,7 +6,6 @@ import axios from 'axios'
 import { toast } from 'react-toastify'
 import { assets } from '../assets/assets'
 
-// Radio component
 const Radio = ({ selected }) => (
   <span
     aria-hidden="true"
@@ -35,7 +34,6 @@ const PlaceOrder = () => {
     products,
   } = useContext(ShopContext)
 
-  // Direct Buy Now product, selected size and quantity
   const buyNowData = useMemo(() => {
     try {
       const saved = sessionStorage.getItem('stylehoodBuyNow')
@@ -68,23 +66,20 @@ const PlaceOrder = () => {
     }))
   }
 
-  // Convert a product into the same format used by the order API
   const formatOrderItem = (product, size, quantity) => ({
     ...product,
     size,
     quantity: Number(quantity),
   })
 
-  // Get product details for Buy Now OR normal cart checkout
   const getOrderItems = () => {
-    // Direct checkout
     if (buyNowData) {
       const productId =
         buyNowData.productId ||
         buyNowData._id ||
         buyNowData.id
 
-      const size = buyNowData.size
+      const size = buyNowData.size || buyNowData.selectedSize
       const quantity = Number(buyNowData.quantity || 1)
 
       const product =
@@ -93,14 +88,18 @@ const PlaceOrder = () => {
         ) ||
         (buyNowData._id ? buyNowData : null)
 
-      if (!product || !size || quantity < 1) {
+      if (
+        !product ||
+        !size ||
+        !Number.isInteger(quantity) ||
+        quantity < 1
+      ) {
         return []
       }
 
       return [formatOrderItem(product, size, quantity)]
     }
 
-    // Normal cart checkout
     const orderItems = []
 
     for (const productId in cartItem) {
@@ -126,12 +125,29 @@ const PlaceOrder = () => {
 
   const orderItems = getOrderItems()
 
-  // Calculate the displayed subtotal from the exact items being ordered
-  const subtotal = orderItems.reduce((total, item) => {
-    return total + Number(item.price || 0) * Number(item.quantity || 0)
-  }, 0)
+  const subtotal = orderItems.reduce(
+    (total, item) =>
+      total + Number(item.price || 0) * Number(item.quantity || 0),
+    0
+  )
 
   const totalAmount = subtotal + Number(delivery_fee || 0)
+
+  // Check stock before checkout
+  const unavailableItems = orderItems.filter((item) => {
+    const product = products.find(
+      (product) => String(product._id) === String(item._id)
+    )
+
+    const availableStock = Number(product?.stock) || 0
+    const requestedQuantity = Number(item.quantity) || 0
+
+    return (
+      !product ||
+      availableStock <= 0 ||
+      requestedQuantity > availableStock
+    )
+  })
 
   const onSubmitHandler = async (event) => {
     event.preventDefault()
@@ -149,13 +165,32 @@ const PlaceOrder = () => {
     if (items.length === 0) {
       toast.error(
         isBuyNow
-          ? 'Buy Now product is still loading or its size is missing. Please return to the product page and try again.'
+          ? 'Product is loading or its size is missing. Please return to the product page.'
           : 'Your cart is empty or products are still loading'
       )
       return
     }
 
-    // Online options are demo-only until merchant API credentials are connected
+    // Refresh stock validation using the latest product data available
+    const stockProblem = items.find((item) => {
+      const product = products.find(
+        (p) => String(p._id) === String(item._id)
+      )
+
+      return (
+        !product ||
+        Number(product.stock || 0) <= 0 ||
+        Number(item.quantity) > Number(product.stock || 0)
+      )
+    })
+
+    if (stockProblem) {
+      toast.error(
+        `${stockProblem.name || 'Product'} is out of stock or the requested quantity is unavailable. Please update your cart.`
+      )
+      return
+    }
+
     if (method === 'jazzcash' || method === 'easypaisa') {
       toast.info(
         `${method === 'jazzcash' ? 'JazzCash' : 'Easypaisa'} demo selected. Official merchant integration is not connected yet. No payment was made.`
@@ -187,7 +222,6 @@ const PlaceOrder = () => {
       )
 
       if (response.data.success) {
-        // Only clear the normal cart when checking out from the cart.
         if (isBuyNow) {
           sessionStorage.removeItem('stylehoodBuyNow')
         } else {
@@ -234,7 +268,6 @@ const PlaceOrder = () => {
       </div>
 
       <div className="grid grid-cols-1 gap-10 lg:grid-cols-[1.15fr_0.85fr]">
-        {/* DELIVERY INFORMATION */}
         <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-7">
           <div className="mb-6">
             <h2 className="text-xl font-bold text-[#0F172A]">
@@ -246,92 +279,18 @@ const PlaceOrder = () => {
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <input
-              required
-              name="firstName"
-              value={formData.firstName}
-              onChange={onChangeHandler}
-              placeholder="First name"
-              className={inputClass}
-            />
-
-            <input
-              required
-              name="lastName"
-              value={formData.lastName}
-              onChange={onChangeHandler}
-              placeholder="Last name"
-              className={inputClass}
-            />
-
-            <input
-              required
-              type="email"
-              name="email"
-              value={formData.email}
-              onChange={onChangeHandler}
-              placeholder="Email address"
-              className={`${inputClass} sm:col-span-2`}
-            />
-
-            <input
-              required
-              name="street"
-              value={formData.street}
-              onChange={onChangeHandler}
-              placeholder="House number and street"
-              className={`${inputClass} sm:col-span-2`}
-            />
-
-            <input
-              required
-              name="city"
-              value={formData.city}
-              onChange={onChangeHandler}
-              placeholder="City"
-              className={inputClass}
-            />
-
-            <input
-              required
-              name="state"
-              value={formData.state}
-              onChange={onChangeHandler}
-              placeholder="Province"
-              className={inputClass}
-            />
-
-            <input
-              required
-              name="zipcode"
-              value={formData.zipcode}
-              onChange={onChangeHandler}
-              placeholder="Postal code"
-              className={inputClass}
-            />
-
-            <input
-              required
-              name="country"
-              value={formData.country}
-              onChange={onChangeHandler}
-              placeholder="Country"
-              className={inputClass}
-            />
-
-            <input
-              required
-              type="tel"
-              name="phone"
-              value={formData.phone}
-              onChange={onChangeHandler}
-              placeholder="Phone number"
-              className={`${inputClass} sm:col-span-2`}
-            />
+            <input required name="firstName" value={formData.firstName} onChange={onChangeHandler} placeholder="First name" className={inputClass} />
+            <input required name="lastName" value={formData.lastName} onChange={onChangeHandler} placeholder="Last name" className={inputClass} />
+            <input required type="email" name="email" value={formData.email} onChange={onChangeHandler} placeholder="Email address" className={`${inputClass} sm:col-span-2`} />
+            <input required name="street" value={formData.street} onChange={onChangeHandler} placeholder="House number and street" className={`${inputClass} sm:col-span-2`} />
+            <input required name="city" value={formData.city} onChange={onChangeHandler} placeholder="City" className={inputClass} />
+            <input required name="state" value={formData.state} onChange={onChangeHandler} placeholder="Province" className={inputClass} />
+            <input required name="zipcode" value={formData.zipcode} onChange={onChangeHandler} placeholder="Postal code" className={inputClass} />
+            <input required name="country" value={formData.country} onChange={onChangeHandler} placeholder="Country" className={inputClass} />
+            <input required type="tel" name="phone" value={formData.phone} onChange={onChangeHandler} placeholder="Phone number" className={`${inputClass} sm:col-span-2`} />
           </div>
         </div>
 
-        {/* ORDER SUMMARY AND PAYMENT */}
         <div className="flex flex-col gap-7">
           <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-7">
             <h2 className="mb-5 text-xl font-bold text-[#0F172A]">
@@ -341,16 +300,9 @@ const PlaceOrder = () => {
             {isBuyNow ? (
               <div className="space-y-4">
                 {orderItems.map((item, index) => (
-                  <div
-                    key={`${item._id}-${item.size}-${index}`}
-                    className="flex items-center gap-4 border-b border-gray-100 pb-4"
-                  >
+                  <div key={`${item._id}-${item.size}-${index}`} className="flex items-center gap-4 border-b border-gray-100 pb-4">
                     <img
-                      src={
-                        Array.isArray(item.Image)
-                          ? item.Image[0]
-                          : item.Image || item.image
-                      }
+                      src={Array.isArray(item.Image) ? item.Image[0] : item.Image || item.image}
                       alt={item.name || item.Name || 'Product'}
                       className="h-20 w-16 rounded-lg bg-gray-100 object-cover"
                     />
@@ -363,10 +315,7 @@ const PlaceOrder = () => {
                         Size: {item.size} · Qty: {item.quantity}
                       </p>
                       <p className="mt-1 font-bold text-[#F97316]">
-                        Rs. {(
-                          Number(item.price || 0) *
-                          Number(item.quantity || 0)
-                        ).toLocaleString()}
+                        Rs. {(Number(item.price || 0) * Number(item.quantity || 0)).toLocaleString()}
                       </p>
                     </div>
                   </div>
@@ -386,11 +335,19 @@ const PlaceOrder = () => {
               <CartTotal />
             )}
 
+            {unavailableItems.length > 0 && (
+              <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                <p className="font-semibold">Stock unavailable</p>
+                <p className="mt-1">
+                  {unavailableItems.map((item) => item.name || 'Product').join(', ')} — please update your cart or select another product.
+                </p>
+              </div>
+            )}
+
             <div className="mt-5 flex items-center justify-between border-t border-gray-200 pt-4">
               <span className="font-semibold text-[#0F172A]">
                 Total Amount
               </span>
-
               <span className="text-xl font-bold text-[#F97316]">
                 Rs. {(
                   isBuyNow
@@ -401,7 +358,6 @@ const PlaceOrder = () => {
             </div>
           </div>
 
-          {/* PAYMENT METHOD */}
           <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-7">
             <div className="mb-5">
               <h2 className="text-xl font-bold text-[#0F172A]">
@@ -413,87 +369,38 @@ const PlaceOrder = () => {
             </div>
 
             <div className="flex flex-col gap-3">
-              {/* JAZZCASH DEMO */}
-              <button
-                type="button"
-                onClick={() => setMethod('jazzcash')}
-                className={paymentCardClass(method === 'jazzcash')}
-              >
+              <button type="button" onClick={() => setMethod('jazzcash')} className={paymentCardClass(method === 'jazzcash')}>
                 <Radio selected={method === 'jazzcash'} />
-
                 <div className="flex h-12 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white">
-                  <img
-                    src={assets.jazzcash}
-                    alt="JazzCash"
-                    className="max-h-12 max-w-full object-contain"
-                    onError={(e) => {
-                      e.currentTarget.style.display = 'none'
-                    }}
-                  />
+                  <img src={assets.jazzcash} alt="JazzCash" className="max-h-12 max-w-full object-contain" onError={(e) => { e.currentTarget.style.display = 'none' }} />
                 </div>
-
                 <div className="min-w-0 flex-1">
-                  <p className="font-bold text-[#0F172A]">
-                    JazzCash
-                  </p>
+                  <p className="font-bold text-[#0F172A]">JazzCash</p>
                 </div>
               </button>
 
-              {/* EASYPAISA DEMO */}
-              <button
-                type="button"
-                onClick={() => setMethod('easypaisa')}
-                className={paymentCardClass(method === 'easypaisa')}
-              >
+              <button type="button" onClick={() => setMethod('easypaisa')} className={paymentCardClass(method === 'easypaisa')}>
                 <Radio selected={method === 'easypaisa'} />
-
                 <div className="flex h-12 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white">
-                  <img
-                    src={assets.easypaisa}
-                    alt="Easypaisa"
-                    className="max-h-12 max-w-full object-contain"
-                    onError={(e) => {
-                      e.currentTarget.style.display = 'none'
-                    }}
-                  />
+                  <img src={assets.easypaisa} alt="Easypaisa" className="max-h-12 max-w-full object-contain" onError={(e) => { e.currentTarget.style.display = 'none' }} />
                 </div>
-
                 <div className="min-w-0 flex-1">
-                  <p className="font-bold text-[#0F172A]">
-                    Easypaisa
-                  </p>
+                  <p className="font-bold text-[#0F172A]">Easypaisa</p>
                 </div>
               </button>
 
-              {/* CASH ON DELIVERY */}
-              <button
-                type="button"
-                onClick={() => setMethod('cod')}
-                className={paymentCardClass(method === 'cod')}
-              >
+              <button type="button" onClick={() => setMethod('cod')} className={paymentCardClass(method === 'cod')}>
                 <Radio selected={method === 'cod'} />
-
                 <div className="flex h-12 w-24 shrink-0 items-center justify-center rounded-lg bg-slate-100">
                   {assets.cod ? (
-                    <img
-                      className="h-12 w-24 object-contain"
-                      src={assets.cod}
-                      alt="Cash on Delivery"
-                    />
+                    <img className="h-12 w-24 object-contain" src={assets.cod} alt="Cash on Delivery" />
                   ) : (
-                    <span className="text-xs font-bold text-slate-700">
-                      CASH
-                    </span>
+                    <span className="text-xs font-bold text-slate-700">CASH</span>
                   )}
                 </div>
-
                 <div className="min-w-0 flex-1">
-                  <p className="font-bold text-[#0F172A]">
-                    Cash on Delivery
-                  </p>
-                  <p className="mt-1 text-xs text-gray-500">
-                    Pay when your order arrives
-                  </p>
+                  <p className="font-bold text-[#0F172A]">Cash on Delivery</p>
+                  <p className="mt-1 text-xs text-gray-500">Pay when your order arrives</p>
                 </div>
               </button>
             </div>
@@ -502,23 +409,23 @@ const PlaceOrder = () => {
               <div className="mt-4 rounded-lg border border-orange-200 bg-orange-50 p-3 text-sm text-orange-800">
                 <p className="font-bold">Portfolio Demo Mode</p>
                 <p className="mt-1">
-                  This payment option is for demonstration only.
-                  No money will be collected and no payment will
-                  be marked as successful.
+                  This payment option is for demonstration only. No money will be collected and no payment will be marked as successful.
                 </p>
               </div>
             )}
 
             <button
               type="submit"
-              disabled={loading || orderItems.length === 0}
+              disabled={loading || orderItems.length === 0 || unavailableItems.length > 0}
               className="mt-6 w-full rounded-xl bg-[#F97316] px-5 py-4 font-bold text-white shadow-md transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {loading
                 ? 'PLEASE WAIT...'
-                : method === 'cod'
-                  ? 'PLACE ORDER'
-                  : 'VIEW DEMO NOTICE'}
+                : unavailableItems.length > 0
+                  ? 'STOCK UNAVAILABLE'
+                  : method === 'cod'
+                    ? 'PLACE ORDER'
+                    : 'VIEW DEMO NOTICE'}
             </button>
 
             <p className="mt-3 text-center text-xs text-gray-500">

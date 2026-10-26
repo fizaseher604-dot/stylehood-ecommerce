@@ -1,26 +1,27 @@
+
+import mongoose from "mongoose";
 import { v2 as cloudinary } from "cloudinary";
 import productModel from "../models/productModel.js";
 
 // Add Product
 const addProduct = async (req, res) => {
-  const startTime = Date.now();
-
   try {
     const {
       name,
       description,
       price,
+      stock,
       category,
       subCategory,
       sizes,
       bestseller,
     } = req.body;
 
-    // Validate required fields
     if (
-      !name ||
-      !description ||
-      !price ||
+      !name?.trim() ||
+      !description?.trim() ||
+      price === undefined ||
+      price === "" ||
       !category ||
       !subCategory ||
       !sizes
@@ -31,7 +32,50 @@ const addProduct = async (req, res) => {
       });
     }
 
-    // Get selected images
+    const numericPrice = Number(price);
+    const numericStock = Number(stock);
+
+    if (!Number.isFinite(numericPrice) || numericPrice < 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Enter a valid product price",
+      });
+    }
+
+    if (
+      stock === undefined ||
+      stock === "" ||
+      !Number.isInteger(numericStock) ||
+      numericStock < 0
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Stock must be a whole number of 0 or more",
+      });
+    }
+
+    let parsedSizes;
+
+    try {
+      parsedSizes = JSON.parse(sizes);
+    } catch {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid product sizes",
+      });
+    }
+
+    if (
+      !Array.isArray(parsedSizes) ||
+      parsedSizes.length === 0 ||
+      !parsedSizes.every((size) => typeof size === "string")
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Select at least one valid size",
+      });
+    }
+
     const images = (req.files || []).filter((file) =>
       ["image1", "image2", "image3", "image4"].includes(file.fieldname)
     );
@@ -42,9 +86,6 @@ const addProduct = async (req, res) => {
         message: "Please select at least one product image",
       });
     }
-
-    // Upload images to Cloudinary in parallel
-    const uploadStart = Date.now();
 
     const imagesUrl = await Promise.all(
       images.map(async (item) => {
@@ -57,34 +98,20 @@ const addProduct = async (req, res) => {
       })
     );
 
-    const uploadTime = Date.now() - uploadStart;
-
-    console.log(`Cloudinary upload time: ${uploadTime} ms`);
-
-    // Prepare product data
-    const productData = {
+    const product = new productModel({
       name: name.trim(),
       description: description.trim(),
-      price: Number(price),
+      price: numericPrice,
+      stock: numericStock,
       category,
       subCategory,
       bestseller: bestseller === "true",
-      Sizes: JSON.parse(sizes),
+      Sizes: parsedSizes,
       Image: imagesUrl,
       date: Date.now(),
-    };
+    });
 
-    // Save product to MongoDB
-    const dbStart = Date.now();
-
-    const product = new productModel(productData);
     await product.save();
-
-    const dbTime = Date.now() - dbStart;
-    const totalTime = Date.now() - startTime;
-
-    console.log(`MongoDB save time: ${dbTime} ms`);
-    console.log(`Total product add time: ${totalTime} ms`);
 
     return res.json({
       success: true,
@@ -108,14 +135,71 @@ const listProducts = async (req, res) => {
 
     return res.json({
       success: true,
-      products,
+      products: products.map((product) => ({
+        ...product,
+        stock: Number.isInteger(Number(product.stock))
+          ? Number(product.stock)
+          : 0,
+      })),
     });
   } catch (error) {
     console.error("List products error:", error);
 
     return res.status(500).json({
       success: false,
-      message: error.message,
+      message: "Failed to load products",
+    });
+  }
+};
+
+// Update Stock
+const updateStock = async (req, res) => {
+  try {
+    const { id, stock } = req.body;
+
+    if (!id || !mongoose.isValidObjectId(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid product ID is required",
+      });
+    }
+
+    if (
+      stock === undefined ||
+      stock === "" ||
+      !Number.isInteger(Number(stock)) ||
+      Number(stock) < 0
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Stock must be a whole number of 0 or more",
+      });
+    }
+
+    const product = await productModel.findByIdAndUpdate(
+      id,
+      { $set: { stock: Number(stock) } },
+      { new: true, runValidators: true }
+    );
+
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: "Product not found",
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: "Stock updated successfully",
+      product,
+    });
+  } catch (error) {
+    console.error("Update stock error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update stock",
     });
   }
 };
@@ -125,10 +209,10 @@ const removeProduct = async (req, res) => {
   try {
     const { id } = req.body;
 
-    if (!id) {
+    if (!id || !mongoose.isValidObjectId(id)) {
       return res.status(400).json({
         success: false,
-        message: "Product ID is required",
+        message: "Valid product ID is required",
       });
     }
 
@@ -151,7 +235,7 @@ const removeProduct = async (req, res) => {
 
     return res.status(500).json({
       success: false,
-      message: error.message,
+      message: "Failed to remove product",
     });
   }
 };
@@ -161,10 +245,10 @@ const singleProduct = async (req, res) => {
   try {
     const { productId } = req.body;
 
-    if (!productId) {
+    if (!productId || !mongoose.isValidObjectId(productId)) {
       return res.status(400).json({
         success: false,
-        message: "Product ID is required",
+        message: "Valid product ID is required",
       });
     }
 
@@ -179,14 +263,19 @@ const singleProduct = async (req, res) => {
 
     return res.json({
       success: true,
-      product,
+      product: {
+        ...product,
+        stock: Number.isInteger(Number(product.stock))
+          ? Number(product.stock)
+          : 0,
+      },
     });
   } catch (error) {
     console.error("Single product error:", error);
 
     return res.status(500).json({
       success: false,
-      message: error.message,
+      message: "Failed to load product",
     });
   }
 };
@@ -194,6 +283,7 @@ const singleProduct = async (req, res) => {
 export {
   addProduct,
   listProducts,
+  updateStock,
   removeProduct,
   singleProduct,
 };

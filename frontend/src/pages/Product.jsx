@@ -16,16 +16,8 @@ const Product = () => {
     const [wishlist, setWishlist] = useState(false)
 
     const productData = products.find(
-        (item) => item._id === productId
+        (item) => String(item._id) === String(productId)
     ) || null
-
-    // Reset selected options when the product changes
-    useEffect(() => {
-    window.scrollTo({
-        top: 0,
-        behavior: 'smooth'
-    })
-}, [productId])
 
     const productImages = Array.isArray(productData?.Image)
         ? productData.Image
@@ -35,12 +27,54 @@ const Product = () => {
         ? productData.Sizes
         : []
 
+    // Stock checking
+    const stock = Math.max(0, Number(productData?.stock) || 0)
+    const isOutOfStock = stock <= 0
+    const maxQuantity = stock
+
+    // Reset selections when product changes
+    useEffect(() => {
+        window.scrollTo({
+            top: 0,
+            behavior: 'smooth'
+        })
+
+        setImage('')
+        setSize('')
+        setQuantity(1)
+        setWishlist(false)
+    }, [productId])
+
+    // Keep quantity within available stock
+    useEffect(() => {
+        if (productData) {
+            setQuantity((previousQuantity) => {
+                if (stock <= 0) return 1
+                return Math.min(Math.max(previousQuantity, 1), maxQuantity)
+            })
+        }
+    }, [productId, stock, maxQuantity, productData])
+
     // Add to cart
     const handleAddToCart = () => {
-        if (!productData) return
+        if (!productData) {
+            toast.error('Product is still loading')
+            return
+        }
+
+        if (isOutOfStock) {
+            toast.error('Sorry, this product is out of stock')
+            return
+        }
 
         if (!size) {
             toast.error('Please select a size first')
+            return
+        }
+
+        if (quantity > stock) {
+            toast.error(`Only ${stock} items are available`)
+            setQuantity(maxQuantity)
             return
         }
 
@@ -48,38 +82,50 @@ const Product = () => {
     }
 
     // Buy now
-   // Buy Now
-const handleBuyNow = () => {
-    if (!productData) {
-        toast.error('Product is still loading')
-        return
+    const handleBuyNow = () => {
+        if (!productData) {
+            toast.error('Product is still loading')
+            return
+        }
+
+        if (isOutOfStock) {
+            toast.error('Sorry, this product is out of stock')
+            return
+        }
+
+        if (!size) {
+            toast.error('Please select a size first')
+            return
+        }
+
+        if (quantity > stock) {
+            toast.error(`Only ${stock} items are available`)
+            setQuantity(maxQuantity)
+            return
+        }
+
+        const buyNowProduct = {
+            ...productData,
+            productId: productData._id,
+            size,
+            selectedSize: size,
+            quantity: Number(quantity)
+        }
+
+        sessionStorage.setItem(
+            'stylehoodBuyNow',
+            JSON.stringify(buyNowProduct)
+        )
+
+        navigate('/place-order')
     }
-
-    if (!size) {
-        toast.error('Please select a size first')
-        return
-    }
-
-    const buyNowProduct = {
-        ...productData,
-        productId: productData._id,
-        size: size,
-        selectedSize: size,
-        quantity: Number(quantity),
-    }
-
-    sessionStorage.setItem(
-        'stylehoodBuyNow',
-        JSON.stringify(buyNowProduct)
-    )
-
-    navigate('/place-order')
-}
 
     // Increase quantity
     const increaseQuantity = () => {
+        if (isOutOfStock) return
+
         setQuantity((previousQuantity) =>
-            Math.min(previousQuantity + 1, 10)
+            Math.min(previousQuantity + 1, maxQuantity)
         )
     }
 
@@ -194,9 +240,11 @@ const handleBuyNow = () => {
 
                     <div className="flex-1 overflow-hidden rounded-2xl bg-[#F8FAFC] relative">
 
-                        <div className="absolute top-4 left-4 z-10 bg-[#F97316] text-white text-xs font-semibold px-4 py-2 rounded-full shadow-md">
-                            NEW
-                        </div>
+                        {!isOutOfStock && (
+                            <div className="absolute top-4 left-4 z-10 bg-[#F97316] text-white text-xs font-semibold px-4 py-2 rounded-full shadow-md">
+                                NEW
+                            </div>
+                        )}
 
                         <button
                             type="button"
@@ -209,10 +257,20 @@ const handleBuyNow = () => {
                             </span>
                         </button>
 
+                        {isOutOfStock && (
+                            <div className="absolute inset-0 z-[5] bg-white/40 flex items-center justify-center pointer-events-none">
+                                <span className="bg-[#0F172A] text-white px-6 py-3 rounded-lg text-sm sm:text-base font-bold tracking-widest shadow-lg">
+                                    OUT OF STOCK
+                                </span>
+                            </div>
+                        )}
+
                         <img
                             src={image || productImages[0] || ''}
                             alt={productData.name}
-                            className="w-full h-auto object-cover transition-transform duration-500 hover:scale-[1.03]"
+                            className={`w-full h-auto object-cover transition-transform duration-500 hover:scale-[1.03] ${
+                                isOutOfStock ? 'opacity-60' : ''
+                            }`}
                         />
 
                     </div>
@@ -267,16 +325,26 @@ const handleBuyNow = () => {
                     </div>
 
                     {/* Availability */}
-                    <div className="flex items-center gap-2 mt-5">
-                        <span className="w-2.5 h-2.5 rounded-full bg-green-500" />
+                    <div className={`flex items-center gap-2 mt-5 rounded-lg px-3 py-3 border ${
+                        isOutOfStock
+                            ? 'bg-red-50 border-red-200'
+                            : 'bg-green-50 border-green-200'
+                    }`}>
+                        <span className={`w-2.5 h-2.5 rounded-full ${
+                            isOutOfStock ? 'bg-red-500' : 'bg-green-500'
+                        }`} />
 
-                        <p className="text-sm font-medium text-green-600">
-                            In Stock
+                        <p className={`text-sm font-semibold ${
+                            isOutOfStock ? 'text-red-600' : 'text-green-700'
+                        }`}>
+                            {isOutOfStock ? 'OUT OF STOCK' : 'In Stock'}
                         </p>
 
-                        <span className="text-sm text-[#64748B]">
-                            • Ready to ship
-                        </span>
+                        {!isOutOfStock && (
+                            <span className="text-sm text-[#64748B]">
+                                • {stock} available
+                            </span>
+                        )}
                     </div>
 
                     {/* Description */}
@@ -302,8 +370,9 @@ const handleBuyNow = () => {
                                 <button
                                     key={index}
                                     type="button"
+                                    disabled={isOutOfStock}
                                     onClick={() => setSize(item)}
-                                    className={`min-w-[58px] h-[48px] rounded-lg border text-sm font-medium transition-all duration-300 ${
+                                    className={`min-w-[58px] h-[48px] rounded-lg border text-sm font-medium transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-40 ${
                                         item === size
                                             ? 'bg-[#0F172A] border-[#0F172A] text-white'
                                             : 'bg-white border-[#CBD5E1] text-[#0F172A] hover:border-[#F97316] hover:text-[#F97316]'
@@ -328,7 +397,8 @@ const handleBuyNow = () => {
                             <button
                                 type="button"
                                 onClick={decreaseQuantity}
-                                className="w-12 h-12 flex items-center justify-center text-xl text-[#0F172A] hover:bg-[#F8FAFC] transition-colors"
+                                disabled={isOutOfStock || quantity <= 1}
+                                className="w-12 h-12 flex items-center justify-center text-xl text-[#0F172A] hover:bg-[#F8FAFC] transition-colors disabled:cursor-not-allowed disabled:opacity-40"
                                 aria-label="Decrease quantity"
                             >
                                 −
@@ -341,13 +411,20 @@ const handleBuyNow = () => {
                             <button
                                 type="button"
                                 onClick={increaseQuantity}
-                                className="w-12 h-12 flex items-center justify-center text-xl text-[#0F172A] hover:bg-[#F8FAFC] transition-colors"
+                                disabled={isOutOfStock || quantity >= maxQuantity}
+                                className="w-12 h-12 flex items-center justify-center text-xl text-[#0F172A] hover:bg-[#F8FAFC] transition-colors disabled:cursor-not-allowed disabled:opacity-40"
                                 aria-label="Increase quantity"
                             >
                                 +
                             </button>
 
                         </div>
+
+                        {!isOutOfStock && (
+                            <p className="text-xs text-[#64748B] mt-2">
+                                Maximum 10 items per order, subject to available stock.
+                            </p>
+                        )}
 
                     </div>
 
@@ -357,17 +434,19 @@ const handleBuyNow = () => {
                         <button
                             type="button"
                             onClick={handleAddToCart}
-                            className="flex-1 bg-white border-2 border-[#F97316] text-[#F97316] py-4 rounded-lg text-sm font-semibold tracking-wide hover:bg-orange-50 transition-all duration-300"
+                            disabled={isOutOfStock}
+                            className="flex-1 bg-white border-2 border-[#F97316] text-[#F97316] py-4 rounded-lg text-sm font-semibold tracking-wide hover:bg-orange-50 transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-white"
                         >
-                            ADD TO CART
+                            {isOutOfStock ? 'OUT OF STOCK' : 'ADD TO CART'}
                         </button>
 
                         <button
                             type="button"
                             onClick={handleBuyNow}
-                            className="flex-1 bg-[#F97316] text-white py-4 rounded-lg text-sm font-semibold tracking-wide hover:bg-[#0F172A] transition-all duration-300 shadow-md hover:shadow-lg"
+                            disabled={isOutOfStock}
+                            className="flex-1 bg-[#F97316] text-white py-4 rounded-lg text-sm font-semibold tracking-wide hover:bg-[#0F172A] transition-all duration-300 shadow-md hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-[#F97316]"
                         >
-                            BUY NOW
+                            {isOutOfStock ? 'OUT OF STOCK' : 'BUY NOW'}
                         </button>
 
                         <button
@@ -501,8 +580,12 @@ const handleBuyNow = () => {
                                 Availability
                             </span>
 
-                            <span className="text-sm font-medium text-green-600">
-                                In Stock
+                            <span className={`text-sm font-semibold ${
+                                isOutOfStock ? 'text-red-600' : 'text-green-600'
+                            }`}>
+                                {isOutOfStock
+                                    ? 'OUT OF STOCK'
+                                    : `In Stock (${stock} available)`}
                             </span>
                         </div>
 
