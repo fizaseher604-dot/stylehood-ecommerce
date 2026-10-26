@@ -33,10 +33,14 @@ const About = () => {
         <div className="relative h-[300px] sm:h-[380px] overflow-hidden rounded-[24px]">
 
           <img
-            src={assets.about_img}
-            alt="Stylehood About Us"
-            className="absolute inset-0 w-full h-full object-cover"
-          />
+              src={assets.about_img}
+              alt="About Stylehood"
+              width="800"
+              height="600"
+              loading="lazy"
+              decoding="async"
+              className="h-full w-full object-cover"
+/>
 
           <div className="absolute inset-0 bg-[#0F172A]/65" />
 

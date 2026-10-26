@@ -79,10 +79,15 @@ const Hero = () => {
           </div>
 
           <img
-            src={assets.hero_img}
-            alt="Hero"
-            className="w-full h-[450px] sm:h-[550px] lg:h-[650px] object-cover hover:scale-105 transition-transform duration-700"
-          />
+           src={assets.hero_img}
+           alt="Stylehood fashion collection"
+           width="1200"
+           height="600"
+           fetchPriority="high"
+           loading="eager"
+           decoding="async"
+           className="h-full w-full object-cover"
+/>
 
         </div>
 
