@@ -93,8 +93,13 @@ const Dashboard = ({ token }) => {
   ]
 
   const recentOrders = [...orders]
-    .sort((a, b) => Number(b.date || 0) - Number(a.date || 0))
-    .slice(0, 5)
+  .sort((a, b) => {
+    const dateA = new Date(a.date || 0).getTime()
+    const dateB = new Date(b.date || 0).getTime()
+
+    return dateB - dateA
+  })
+  .slice(0, 5)
 
   const formatDate = (date) => {
     if (!date) return 'Date unavailable'
@@ -241,10 +246,13 @@ const Dashboard = ({ token }) => {
                       {order.address?.lastName || ''}
                     </p>
 
-                    <p className="mt-1 text-xs text-slate-500">
-                      {formatDate(order.date)} ·{' '}
-                      {order.items?.length || 0} item(s)
-                    </p>
+                   <p className="mt-1 text-xs text-slate-500">
+                {formatDate(order.date)} · {order.items?.length || 0} item(s)
+                      </p>
+
+                      <p className="mt-1 text-xs font-medium text-slate-600">
+                        Payment: {order.paymentMethod || 'Not specified'}
+                      </p>
                   </div>
                 </div>
 
