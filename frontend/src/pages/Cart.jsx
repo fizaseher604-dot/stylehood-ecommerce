@@ -9,11 +9,13 @@ import { Link } from 'react-router-dom'
 const Cart = () => {
   const {
     products,
+    productsLoading,
+    cartLoading,
     currency,
     cartItem,
     updateQuantity,
     navigate
-  } = useContext(ShopContext)
+} = useContext(ShopContext)
 
   const cartData = Object.entries(cartItem || {}).flatMap(
     ([itemId, sizes]) =>
@@ -25,6 +27,21 @@ const Cart = () => {
           quantity: Number(quantity)
         }))
   )
+  if (cartLoading || productsLoading) {
+    return (
+        <div className="w-full min-h-[60vh] flex flex-col items-center justify-center px-4">
+            <div className="w-12 h-12 border-4 border-slate-200 border-t-[#F97316] rounded-full animate-spin"></div>
+
+            <p className="mt-5 text-[#0F172A] font-semibold text-lg">
+                Loading your cart...
+            </p>
+
+            <p className="mt-1 text-sm text-slate-500">
+                Please wait while we fetch your products.
+            </p>
+        </div>
+    )
+}
 
   return (
     <div className="w-full min-w-0 border-t border-slate-200 pt-7 sm:pt-12 px-3 sm:px-6 lg:px-12 pb-8">

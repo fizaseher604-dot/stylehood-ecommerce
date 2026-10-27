@@ -17,6 +17,7 @@ const ShopContextProvider = (props) => {
     const [showSearch, setShowSearch] = useState(false);
     const [cartItem, setCartItem] = useState({});
     const [products, setProducts] = useState([]);
+    const [cartLoading, setCartLoading] = useState(true);
     const [productsLoading, setProductsLoading] = useState(true);
     const [token, setToken] = useState(
         localStorage.getItem("token") || ""
@@ -96,41 +97,50 @@ const addToCart = async (itemId, size, quantity = 1) => {
     }
 };
 
-    // Fetch cart data
-    const loadUserCart = useCallback(
-        async (currentToken, showError = false) => {
-            if (!currentToken) {
+  // Fetch cart data with loading state
+const loadUserCart = useCallback(
+    async (currentToken, showError = false) => {
+        setCartLoading(true);
+
+        if (!currentToken) {
+            setCartItem({});
+            setCartLoading(false);
+            return;
+        }
+
+        try {
+            const response = await axios.post(
+                `${backendUrl}/api/cart/get`,
+                {},
+                { headers: { token: currentToken } }
+            );
+
+            if (response.data.success) {
+                setCartItem(response.data.cartData || {});
+            } else {
                 setCartItem({});
-                return;
-            }
 
-            try {
-                const response = await axios.post(
-                    `${backendUrl}/api/cart/get`,
-                    {},
-                    { headers: { token: currentToken } }
-                );
-
-                if (response.data.success) {
-                    setCartItem(response.data.cartData || {});
-                } else if (showError) {
+                if (showError) {
                     toast.error(
                         response.data.message || "Unable to load cart"
                     );
                 }
-            } catch (error) {
-                console.error("Load Cart Error:", error);
-
-                if (showError) {
-                    toast.error(
-                        error.response?.data?.message ||
-                            "Unable to load your cart"
-                    );
-                }
             }
-        },
-        [backendUrl]
-    );
+        } catch (error) {
+            console.error("Load Cart Error:", error);
+
+            if (showError) {
+                toast.error(
+                    error.response?.data?.message ||
+                        "Unable to load your cart"
+                );
+            }
+        } finally {
+            setCartLoading(false);
+        }
+    },
+    [backendUrl]
+);
 
     // Refresh cart
     const refreshCart = useCallback(async () => {
@@ -277,17 +287,18 @@ const addToCart = async (itemId, size, quantity = 1) => {
     }, [backendUrl]);
 
     // Sync cart when token changes
-    useEffect(() => {
-        if (!token) {
-            localStorage.removeItem("token");
-            setCartItem({});
-            return;
-        }
+useEffect(() => {
+    if (!token) {
+        localStorage.removeItem("token");
+        setCartItem({});
+        setCartLoading(false);
+        return;
+    }
 
-        localStorage.setItem("token", token);
+    localStorage.setItem("token", token);
 
-        loadUserCart(token);
-    }, [token, loadUserCart]);
+    loadUserCart(token);
+}, [token, loadUserCart]);
 
     // Context values
     const value = {
@@ -310,6 +321,7 @@ const addToCart = async (itemId, size, quantity = 1) => {
         token,
         setToken,
         refreshCart,
+        cartLoading,
     };
 
     return (
