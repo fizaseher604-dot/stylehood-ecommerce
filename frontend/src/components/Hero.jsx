@@ -32,23 +32,23 @@ const Hero = () => {
           </p>
 
           {/* Buttons */}
-          <div className="flex gap-4 mt-8">
+<div className="flex flex-row items-center gap-3 sm:gap-4 mt-7 sm:mt-8 w-full sm:w-auto">
 
-            <Link
-              to="/collection"
-              className="bg-orange-500 hover:bg-orange-600 text-white px-7 py-3 rounded-lg transition duration-300 shadow-md"
-            >
-              Shop Now →
-            </Link>
+  <Link
+    to="/collection"
+    className="flex-1 sm:flex-none text-center bg-orange-500 hover:bg-orange-600 text-white px-4 sm:px-7 py-3 rounded-lg transition duration-300 shadow-md text-sm sm:text-base font-medium whitespace-nowrap"
+  >
+    Shop Now →
+  </Link>
 
-            <Link
-              to="/collection"
-              className="border border-gray-400 hover:border-orange-500 hover:text-orange-500 px-7 py-3 rounded-lg transition duration-300"
-            >
-              Explore
-            </Link>
+  <Link
+    to="/collection"
+    className="flex-1 sm:flex-none text-center border border-gray-400 hover:border-orange-500 hover:text-orange-500 px-4 sm:px-7 py-3 rounded-lg transition duration-300 text-sm sm:text-base font-medium whitespace-nowrap"
+  >
+    Explore
+  </Link>
 
-          </div>
+</div>
 
           {/* Features */}
           <div className="flex gap-8 mt-10 text-sm text-gray-600">

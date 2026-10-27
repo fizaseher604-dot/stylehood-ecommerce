@@ -5,7 +5,7 @@ import Title from '../components/Title'
 import ProductItem from '../components/ProductItem'
 
 const Collection = () => {
-  const { products, search } = useContext(ShopContext)
+  const { products, productsLoading, search } = useContext(ShopContext)
 
   const [showFilter, setShowFilter] = useState(false)
   const [category, setCategory] = useState([])
@@ -274,9 +274,22 @@ const Collection = () => {
       )}
 
       {/* Products */}
-      {filterProducts.length > 0 ? (
+           {/* Products */}
+      {productsLoading ? (
+        <div className="min-h-[300px] flex flex-col items-center justify-center text-center">
+          <div className="w-12 h-12 border-4 border-slate-200 border-t-[#F97316] rounded-full animate-spin"></div>
+
+          <h3 className="text-lg font-semibold text-[#0F172A] mt-5">
+            Loading Collection...
+          </h3>
+
+          <p className="text-sm text-[#64748B] mt-2">
+            Please wait while we load your products.
+          </p>
+        </div>
+      ) : filterProducts.length > 0 ? (
         <>
-          <div className='grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-x-5 gap-y-10'>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-x-5 gap-y-10">
             {filterProducts.map((item, index) => (
               <ProductItem
                 key={item._id || index}
@@ -288,29 +301,29 @@ const Collection = () => {
             ))}
           </div>
 
-          <div className='text-center mt-14'>
-            <p className='text-sm text-[#64748B]'>
+          <div className="text-center mt-14">
+            <p className="text-sm text-[#64748B]">
               Showing {filterProducts.length} of {(products || []).length} products
             </p>
           </div>
         </>
       ) : (
-        <div className='min-h-[300px] flex flex-col items-center justify-center text-center'>
-          <div className='w-16 h-16 rounded-full bg-[#F8FAFC] flex items-center justify-center mb-5 text-2xl'>
+        <div className="min-h-[300px] flex flex-col items-center justify-center text-center">
+          <div className="w-16 h-16 rounded-full bg-[#F8FAFC] flex items-center justify-center mb-5 text-2xl">
             🔍
           </div>
 
-          <h3 className='text-lg font-semibold text-[#0F172A]'>
+          <h3 className="text-lg font-semibold text-[#0F172A]">
             No Products Found
           </h3>
 
-          <p className='text-sm text-[#64748B] mt-2 max-w-sm'>
+          <p className="text-sm text-[#64748B] mt-2 max-w-sm">
             Try changing your search or filters to find something you like.
           </p>
 
           <button
             onClick={clearFilters}
-            className='mt-5 px-5 py-2.5 bg-[#0F172A] text-white text-sm rounded-lg hover:bg-[#F97316] transition-all duration-300'
+            className="mt-5 px-5 py-2.5 bg-[#0F172A] text-white text-sm rounded-lg hover:bg-[#F97316] transition-all duration-300"
           >
             Clear Filters
           </button>
